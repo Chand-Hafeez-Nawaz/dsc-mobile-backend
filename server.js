@@ -16,6 +16,16 @@ app.get("/", (req, res) => {
   res.json({ message: "Mobile Backend Running" });
 });
 
+const fs = require("fs");
+const path = require("path");
+
+// Ensure uploads folder exists
+const uploadPath = path.join(__dirname, "uploads");
+
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath);
+}
+
 // Routes
 const noticeRoutes = require("./routes/noticeRoutes");
 const eventRoutes = require("./routes/eventRoutes");
