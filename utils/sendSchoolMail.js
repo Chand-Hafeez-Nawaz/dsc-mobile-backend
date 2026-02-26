@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer");
 
+// ✅ FIXED transporter
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
