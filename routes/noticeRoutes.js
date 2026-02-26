@@ -29,11 +29,13 @@ router.post("/", upload.single("file"), async (req, res) => {
       return res.status(400).json({ message: "All fields required" });
     }
 
-    const notice = await Notice.create({
+    const notice = new Notice({
       title,
       description,
       file: req.file ? req.file.path : null,
     });
+
+    await notice.save();
 
     res.status(201).json(notice);
   } catch (error) {
@@ -60,12 +62,12 @@ router.put("/:id", upload.single("file"), async (req, res) => {
   try {
     const { title, description } = req.body;
 
-    const updateData = {};
+    const updateData = {
+      title,
+      description,
+    };
 
-    if (title) updateData.title = title;
-    if (description) updateData.description = description;
-
-    // If new file uploaded, update file
+    // Only update file if new file uploaded
     if (req.file) {
       updateData.file = req.file.path;
     }
