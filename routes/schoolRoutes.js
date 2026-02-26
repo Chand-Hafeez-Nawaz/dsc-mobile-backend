@@ -119,10 +119,14 @@ router.put("/approve/:id", async (req, res) => {
     school.approvedAt = new Date();
     await school.save();
 
-    // 🔥 Send approval email
-    await sendApprovalMail(school);
+    // ✅ MAIL SHOULD NOT BREAK APPROVAL
+    try {
+      await sendApprovalMail(school);
+    } catch (mailError) {
+      console.log("Mail failed but school approved:", mailError.message);
+    }
 
-    res.json({ message: "School approved & email sent" });
+    res.json({ message: "School approved successfully" });
   } catch (error) {
     console.error("Approve School Error:", error);
     res.status(500).json({ message: "Server error" });
@@ -139,12 +143,16 @@ router.delete("/reject/:id", async (req, res) => {
       return res.status(404).json({ message: "School not found" });
     }
 
-    // 🔥 Send rejection email
-    await sendRejectionMail(school);
+    // ✅ Mail should not break rejection
+    try {
+      await sendRejectionMail(school);
+    } catch (mailError) {
+      console.log("Mail failed but school rejected:", mailError.message);
+    }
 
     await School.findByIdAndDelete(req.params.id);
 
-    res.json({ message: "School rejected & email sent" });
+    res.json({ message: "School rejected successfully" });
   } catch (error) {
     console.error("Reject School Error:", error);
     res.status(500).json({ message: "Server error" });
