@@ -9,38 +9,35 @@ const upload = multer({ storage });
 
 /* ================= UPLOAD ================= */
 
-router.post("/", upload.array("media", 20), async (req, res) => {
+router.post("/", upload.single("media"), async (req, res) => {
   try {
-    const files = req.files;
-
-    if (!files || files.length === 0) {
-      return res.status(400).json({ message: "No files uploaded" });
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
     }
 
-    const uploadedItems = [];
-
-    for (let file of files) {
-      const result = await cloudinary.uploader.upload_stream(
+    // Upload to Cloudinary using promise wrapper
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
         { resource_type: "auto" },
-        async (error, result) => {
-          if (error) throw error;
-
-          const newItem = await Gallery.create({
-            url: result.secure_url,
-            type: result.resource_type === "video" ? "video" : "image",
-          });
-
-          uploadedItems.push(newItem);
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
         }
       );
 
-      result.end(file.buffer);
-    }
+      stream.end(req.file.buffer);
+    });
 
-    res.status(201).json(uploadedItems);
+    const newItem = await Gallery.create({
+      url: result.secure_url,
+      public_id: result.public_id, // REQUIRED for delete
+      type: result.resource_type === "video" ? "video" : "image",
+    });
+
+    res.status(201).json(newItem);
   } catch (error) {
     console.error("Gallery Upload Error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error during upload" });
   }
 });
 
@@ -52,7 +49,35 @@ router.get("/", async (req, res) => {
     res.json(gallery);
   } catch (error) {
     console.error("Fetch Gallery Error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error while fetching gallery" });
+  }
+});
+
+/* ================= DELETE ================= */
+
+router.delete("/:id", async (req, res) => {
+  try {
+    const galleryItem = await Gallery.findById(req.params.id);
+
+    if (!galleryItem) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    // Delete from Cloudinary
+    if (galleryItem.public_id) {
+      await cloudinary.uploader.destroy(galleryItem.public_id, {
+        resource_type:
+          galleryItem.type === "video" ? "video" : "image",
+      });
+    }
+
+    // Delete from MongoDB
+    await Gallery.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({ message: "Deleted successfully" });
+  } catch (error) {
+    console.error("Delete Gallery Error:", error);
+    res.status(500).json({ message: "Server error while deleting" });
   }
 });
 

@@ -6,6 +6,10 @@ const gallerySchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    public_id: {
+      type: String, // 🔥 REQUIRED for Cloudinary delete
+      required: true,
+    },
     type: {
       type: String,
       enum: ["image", "video"],
