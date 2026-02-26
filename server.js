@@ -37,11 +37,13 @@ const noticeRoutes = require("./routes/noticeRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const authRoutes = require("./routes/authRoutes");
 const galleryRoutes = require("./routes/galleryRoutes");
+const schoolRoutes = require("./routes/schoolRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/notices", noticeRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/gallery", galleryRoutes);
+app.use("/api/schools", schoolRoutes);
 
 /* ================= DATABASE & SERVER START ================= */
 
