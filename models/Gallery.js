@@ -2,14 +2,14 @@ const mongoose = require("mongoose");
 
 const gallerySchema = new mongoose.Schema(
   {
-    mediaType: {
+    url: {
       type: String,
-      enum: ["image", "video"],
       required: true,
     },
-    media: {
+    type: {
       type: String,
-      required: true,
+      enum: ["image", "video"],
+      default: "image",
     },
   },
   { timestamps: true }

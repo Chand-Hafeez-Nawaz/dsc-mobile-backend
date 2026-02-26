@@ -2,18 +2,9 @@ const mongoose = require("mongoose");
 
 const noticeSchema = new mongoose.Schema(
   {
-    title: {
-      type: String,
-      required: true,
-    },
-    description: {
-      type: String,
-      required: true,
-    },
-    file: {
-      type: String,
-      default: null,
-    },
+    title: String,
+    description: String,
+    file: String,
   },
   { timestamps: true }
 );

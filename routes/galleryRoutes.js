@@ -1,53 +1,45 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("../config/cloudinary");
 const Gallery = require("../models/Gallery");
 
-/* ================= CLOUDINARY STORAGE ================= */
-
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: async (req, file) => {
-    const isVideo = file.mimetype.startsWith("video");
-
-    return {
-      folder: "DSC_GALLERY",
-      resource_type: isVideo ? "video" : "image",
-    };
-  },
-});
-
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-/* ================= CREATE MULTIPLE MEDIA ================= */
+/* ================= UPLOAD ================= */
 
 router.post("/", upload.array("media", 20), async (req, res) => {
-  console.log("FILES RECIEVED:",req.files)
   try {
-    if (!req.files || req.files.length === 0) {
+    const files = req.files;
+
+    if (!files || files.length === 0) {
       return res.status(400).json({ message: "No files uploaded" });
     }
 
-    const mediaItems = [];
+    const uploadedItems = [];
 
-    for (const file of req.files) {
-      const mediaType = file.mimetype.startsWith("video")
-        ? "video"
-        : "image";
+    for (let file of files) {
+      const result = await cloudinary.uploader.upload_stream(
+        { resource_type: "auto" },
+        async (error, result) => {
+          if (error) throw error;
 
-      const newMedia = await Gallery.create({
-        mediaType,
-        media: file.path, // Cloudinary secure URL
-      });
+          const newItem = await Gallery.create({
+            url: result.secure_url,
+            type: result.resource_type === "video" ? "video" : "image",
+          });
 
-      mediaItems.push(newMedia);
+          uploadedItems.push(newItem);
+        }
+      );
+
+      result.end(file.buffer);
     }
 
-    res.status(201).json(mediaItems);
+    res.status(201).json(uploadedItems);
   } catch (error) {
-    console.error("Gallery upload error:", error);
+    console.error("Gallery Upload Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -56,43 +48,10 @@ router.post("/", upload.array("media", 20), async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const media = await Gallery.find().sort({ createdAt: -1 });
-    res.json(media);
+    const gallery = await Gallery.find().sort({ createdAt: -1 });
+    res.json(gallery);
   } catch (error) {
-    console.error("Fetch gallery error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-/* ================= DELETE ================= */
-
-router.delete("/:id", async (req, res) => {
-  try {
-    const mediaItem = await Gallery.findById(req.params.id);
-
-    if (!mediaItem) {
-      return res.status(404).json({ message: "Not found" });
-    }
-
-    // Extract public_id safely
-    const urlParts = mediaItem.media.split("/");
-    const fileWithExtension = urlParts[urlParts.length - 1];
-    const publicIdWithoutExtension = fileWithExtension.substring(
-      0,
-      fileWithExtension.lastIndexOf(".")
-    );
-
-    const publicId = `DSC_GALLERY/${publicIdWithoutExtension}`;
-
-    await cloudinary.uploader.destroy(publicId, {
-      resource_type: mediaItem.mediaType === "video" ? "video" : "image",
-    });
-
-    await Gallery.findByIdAndDelete(req.params.id);
-
-    res.json({ message: "Deleted successfully" });
-  } catch (error) {
-    console.error("Delete gallery error:", error);
+    console.error("Fetch Gallery Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

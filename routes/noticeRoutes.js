@@ -1,113 +1,59 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const path = require("path");
 const Notice = require("../models/Notice");
 
-/* ================= MULTER CONFIG ================= */
-
+// ✅ Multer Storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "uploads/");
   },
   filename: function (req, file, cb) {
-    const uniqueName =
-      Date.now() + "-" + file.originalname.replace(/\s+/g, "_");
-    cb(null, uniqueName);
+    cb(null, Date.now() + "-" + file.originalname);
   },
 });
 
-// Accept ANY file type
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+});
 
-/* ================= CREATE NOTICE ================= */
-
+// ✅ CREATE NOTICE
 router.post("/", upload.single("file"), async (req, res) => {
   try {
-    console.log("BODY:", req.body);
-    console.log("FILE:", req.file);
-
-    if (!req.body) {
-      return res.status(400).json({ message: "Invalid form data" });
-    }
-
     const { title, description } = req.body;
 
-    if (!title || !description) {
-      return res.status(400).json({ message: "All fields required" });
-    }
-
-    const notice = await Notice.create({
+    const notice = new Notice({
       title,
       description,
       file: req.file ? req.file.path : null,
     });
 
+    await notice.save();
     res.status(201).json(notice);
   } catch (error) {
-    console.error("Create Notice Error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log("Notice Create Error:", error);
+    res.status(500).json({ message: "Server Error" });
   }
 });
 
-/* ================= GET ALL NOTICES ================= */
-
+// ✅ GET ALL NOTICES
 router.get("/", async (req, res) => {
   try {
     const notices = await Notice.find().sort({ createdAt: -1 });
     res.json(notices);
   } catch (error) {
-    console.error("Fetch Notices Error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server Error" });
   }
 });
 
-/* ================= UPDATE NOTICE ================= */
-
-router.put("/:id", upload.single("file"), async (req, res) => {
-  try {
-    console.log("UPDATE BODY:", req.body);
-    console.log("UPDATE FILE:", req.file);
-
-    const { title, description } = req.body || {};
-
-    const updateData = {};
-
-    if (title) updateData.title = title;
-    if (description) updateData.description = description;
-    if (req.file) updateData.file = req.file.path;
-
-    const updated = await Notice.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
-    );
-
-    if (!updated) {
-      return res.status(404).json({ message: "Notice not found" });
-    }
-
-    res.json(updated);
-  } catch (error) {
-    console.error("Update Notice Error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-/* ================= DELETE NOTICE ================= */
-
+// ✅ DELETE
 router.delete("/:id", async (req, res) => {
   try {
-    const deleted = await Notice.findByIdAndDelete(req.params.id);
-
-    if (!deleted) {
-      return res.status(404).json({ message: "Notice not found" });
-    }
-
-    res.json({ message: "Notice deleted successfully" });
+    await Notice.findByIdAndDelete(req.params.id);
+    res.json({ message: "Deleted successfully" });
   } catch (error) {
-    console.error("Delete Notice Error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server Error" });
   }
 });
 
