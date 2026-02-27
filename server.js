@@ -38,12 +38,14 @@ const eventRoutes = require("./routes/eventRoutes");
 const authRoutes = require("./routes/authRoutes");
 const galleryRoutes = require("./routes/galleryRoutes");
 const schoolRoutes = require("./routes/schoolRoutes");
+const visitRoutes = require("./routes/visitRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/notices", noticeRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/gallery", galleryRoutes);
 app.use("/api/schools", schoolRoutes);
+app.use("/api/visits", visitRoutes);
 
 /* ================= DATABASE & SERVER START ================= */
 
