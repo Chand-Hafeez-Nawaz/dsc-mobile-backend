@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "b58c0f6c-9538-430b-8df9-2a1267547330"
+      }
+    },
+    "android": {
+      "package": "com.chandhafeeznawaz.dsc_mobile_backend_v2"
+    }
+  }
+}

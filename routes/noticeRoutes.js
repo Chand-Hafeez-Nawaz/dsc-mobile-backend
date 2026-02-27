@@ -21,26 +21,34 @@ const upload = multer({ storage });
 
 /* ================= CREATE NOTICE ================= */
 
-router.post("/", upload.single("file"), async (req, res) => {
+const cloudinary = require("../config/cloudinary");
+
+router.post("/add", upload.single("file"), async (req, res) => {
   try {
     const { title, description } = req.body;
 
-    if (!title || !description) {
-      return res.status(400).json({ message: "All fields required" });
+    let fileUrl = "";
+
+    if (req.file) {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "raw", // 🔥 important for pdf/doc
+        folder: "notices",
+      });
+
+      fileUrl = result.secure_url;
     }
 
-    const notice = new Notice({
+    await Notice.create({
       title,
       description,
-      file: req.file ? req.file.path : null,
+      file: fileUrl, // ✅ SAVE CLOUDINARY URL
     });
 
-    await notice.save();
+    res.json({ message: "Notice created successfully" });
 
-    res.status(201).json(notice);
   } catch (error) {
-    console.error("Create Notice Error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log("Notice Upload Error:", error);
+    res.status(500).json({ message: "Upload failed" });
   }
 });
 

@@ -48,25 +48,30 @@ const upload = multer({
 
 /* ================= CREATE EVENT ================= */
 
-router.post("/", upload.single("file"), async (req, res) => {
+const cloudinary = require("../config/cloudinary");
+
+router.post("/add", upload.single("file"), async (req, res) => {
   try {
     const { title, description, date } = req.body;
 
-    if (!title || !description || !date) {
-      return res.status(400).json({ message: "All fields required" });
-    }
+    // 🔥 Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      resource_type: "raw", // VERY IMPORTANT for pdf/doc
+      folder: "events",
+    });
 
-    const event = await Event.create({
+    await Event.create({
       title,
       description,
       date,
-      file: req.file ? req.file.path : null,
+      file: result.secure_url, // ✅ SAVE CLOUDINARY URL
     });
 
-    res.status(201).json(event);
+    res.json({ message: "Event created successfully" });
+
   } catch (error) {
-    console.error("Create Event Error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log(error);
+    res.status(500).json({ message: "Upload failed" });
   }
 });
 
