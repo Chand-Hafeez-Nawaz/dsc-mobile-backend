@@ -2,15 +2,19 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 const Event = require("../models/Event");
 const cloudinary = require("../config/cloudinary");
 
 /* ================= MULTER CONFIG ================= */
 
-// Storage configuration
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/");
+    const uploadPath = "uploads/";
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
     const uniqueName =
@@ -19,33 +23,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const allowedExtensions = [
-  ".pdf",
-  ".doc",
-  ".docx",
-  ".ppt",
-  ".pptx",
-  ".xls",
-  ".xlsx",
-  ".jpg",
-  ".jpeg",
-  ".png",
-];
-
-const fileFilter = (req, file, cb) => {
-  const ext = path.extname(file.originalname).toLowerCase();
-
-  if (allowedExtensions.includes(ext)) {
-    cb(null, true);
-  } else {
-    cb(new Error("Unsupported file type"), false);
-  }
-};
-
-const upload = multer({
-  storage,
-  fileFilter,
-});
+const upload = multer({ storage });
 
 /* ================= CREATE EVENT ================= */
 
@@ -53,25 +31,32 @@ router.post("/add", upload.single("file"), async (req, res) => {
   try {
     const { title, description, date } = req.body;
 
-    if (!req.file) {
-      return res.status(400).json({ message: "File is required" });
+    if (!title || !description || !date) {
+      return res.status(400).json({ message: "All fields required" });
     }
 
-    // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      resource_type: "raw", // important for docs
-      folder: "events",
-    });
+    let fileUrl = "";
 
-    await Event.create({
+    if (req.file) {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "raw",
+        folder: "events",
+      });
+
+      fileUrl = result.secure_url;
+
+      // delete local file after upload
+      fs.unlinkSync(req.file.path);
+    }
+
+    const newEvent = await Event.create({
       title,
       description,
       date,
-      file: result.secure_url,
+      file: fileUrl,
     });
 
-    res.json({ message: "Event created successfully" });
-
+    res.json(newEvent);
   } catch (error) {
     console.log("CREATE EVENT ERROR:", error);
     res.status(500).json({ message: error.message });
@@ -85,7 +70,6 @@ router.get("/", async (req, res) => {
     const events = await Event.find().sort({ createdAt: -1 });
     res.json(events);
   } catch (error) {
-    console.error("Fetch Events Error:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -96,11 +80,7 @@ router.put("/:id", upload.single("file"), async (req, res) => {
   try {
     const { title, description, date } = req.body;
 
-    const updateData = {
-      title,
-      description,
-      date,
-    };
+    const updateData = { title, description, date };
 
     if (req.file) {
       const result = await cloudinary.uploader.upload(req.file.path, {
@@ -109,6 +89,8 @@ router.put("/:id", upload.single("file"), async (req, res) => {
       });
 
       updateData.file = result.secure_url;
+
+      fs.unlinkSync(req.file.path);
     }
 
     const updatedEvent = await Event.findByIdAndUpdate(
@@ -117,14 +99,8 @@ router.put("/:id", upload.single("file"), async (req, res) => {
       { new: true }
     );
 
-    if (!updatedEvent) {
-      return res.status(404).json({ message: "Event not found" });
-    }
-
     res.json(updatedEvent);
-
   } catch (error) {
-    console.log("UPDATE EVENT ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -133,16 +109,9 @@ router.put("/:id", upload.single("file"), async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   try {
-    const deletedEvent = await Event.findByIdAndDelete(req.params.id);
-
-    if (!deletedEvent) {
-      return res.status(404).json({ message: "Event not found" });
-    }
-
-    res.json({ message: "Event deleted successfully" });
-
+    await Event.findByIdAndDelete(req.params.id);
+    res.json({ message: "Deleted successfully" });
   } catch (error) {
-    console.log("DELETE EVENT ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 });
