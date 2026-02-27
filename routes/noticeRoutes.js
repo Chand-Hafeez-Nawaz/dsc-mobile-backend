@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
+const fs = require("fs");
 const path = require("path");
 const Notice = require("../models/Notice");
 const cloudinary = require("../config/cloudinary");
@@ -9,7 +10,11 @@ const cloudinary = require("../config/cloudinary");
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/");
+    const uploadPath = "uploads/";
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
     const uniqueName =
@@ -26,23 +31,31 @@ router.post("/add", upload.single("file"), async (req, res) => {
   try {
     const { title, description } = req.body;
 
-    if (!req.file) {
-      return res.status(400).json({ message: "File is required" });
+    if (!title || !description) {
+      return res.status(400).json({ message: "All fields required" });
     }
 
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      resource_type: "raw", // important for pdf/doc/docx
-      folder: "notices",
-    });
+    let fileUrl = "";
 
-    await Notice.create({
+    if (req.file) {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "raw",
+        folder: "notices",
+      });
+
+      fileUrl = result.secure_url;
+
+      // delete local file after upload
+      fs.unlinkSync(req.file.path);
+    }
+
+    const newNotice = await Notice.create({
       title,
       description,
-      file: result.secure_url,
+      file: fileUrl,
     });
 
-    res.json({ message: "Notice created successfully" });
-
+    res.json(newNotice);
   } catch (error) {
     console.log("CREATE NOTICE ERROR:", error);
     res.status(500).json({ message: error.message });
@@ -56,7 +69,6 @@ router.get("/", async (req, res) => {
     const notices = await Notice.find().sort({ createdAt: -1 });
     res.json(notices);
   } catch (error) {
-    console.log("Fetch Notices Error:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -67,10 +79,7 @@ router.put("/:id", upload.single("file"), async (req, res) => {
   try {
     const { title, description } = req.body;
 
-    const updateData = {
-      title,
-      description,
-    };
+    const updateData = { title, description };
 
     if (req.file) {
       const result = await cloudinary.uploader.upload(req.file.path, {
@@ -79,6 +88,8 @@ router.put("/:id", upload.single("file"), async (req, res) => {
       });
 
       updateData.file = result.secure_url;
+
+      fs.unlinkSync(req.file.path);
     }
 
     const updatedNotice = await Notice.findByIdAndUpdate(
@@ -87,14 +98,8 @@ router.put("/:id", upload.single("file"), async (req, res) => {
       { new: true }
     );
 
-    if (!updatedNotice) {
-      return res.status(404).json({ message: "Notice not found" });
-    }
-
     res.json(updatedNotice);
-
   } catch (error) {
-    console.log("UPDATE NOTICE ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -103,16 +108,9 @@ router.put("/:id", upload.single("file"), async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   try {
-    const deletedNotice = await Notice.findByIdAndDelete(req.params.id);
-
-    if (!deletedNotice) {
-      return res.status(404).json({ message: "Notice not found" });
-    }
-
-    res.json({ message: "Notice deleted successfully" });
-
+    await Notice.findByIdAndDelete(req.params.id);
+    res.json({ message: "Deleted successfully" });
   } catch (error) {
-    console.log("DELETE NOTICE ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 });
