@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const Event = require("../models/Event");
+const cloudinary = require("../config/cloudinary");
 
 /* ================= MULTER CONFIG ================= */
 
@@ -48,15 +49,17 @@ const upload = multer({
 
 /* ================= CREATE EVENT ================= */
 
-const cloudinary = require("../config/cloudinary");
-
 router.post("/add", upload.single("file"), async (req, res) => {
   try {
     const { title, description, date } = req.body;
 
-    // 🔥 Upload to Cloudinary
+    if (!req.file) {
+      return res.status(400).json({ message: "File is required" });
+    }
+
+    // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(req.file.path, {
-      resource_type: "raw", // VERY IMPORTANT for pdf/doc
+      resource_type: "raw", // important for docs
       folder: "events",
     });
 
@@ -64,14 +67,14 @@ router.post("/add", upload.single("file"), async (req, res) => {
       title,
       description,
       date,
-      file: result.secure_url, // ✅ SAVE CLOUDINARY URL
+      file: result.secure_url,
     });
 
     res.json({ message: "Event created successfully" });
 
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Upload failed" });
+    console.log("CREATE EVENT ERROR:", error);
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -83,7 +86,7 @@ router.get("/", async (req, res) => {
     res.json(events);
   } catch (error) {
     console.error("Fetch Events Error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -99,17 +102,19 @@ router.put("/:id", upload.single("file"), async (req, res) => {
       date,
     };
 
-    // Only update file if new file uploaded
     if (req.file) {
-      updateData.file = req.file.path;
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "raw",
+        folder: "events",
+      });
+
+      updateData.file = result.secure_url;
     }
 
     const updatedEvent = await Event.findByIdAndUpdate(
       req.params.id,
       updateData,
-      {
-        returnDocument: "after", // modern mongoose way
-      }
+      { new: true }
     );
 
     if (!updatedEvent) {
@@ -117,9 +122,10 @@ router.put("/:id", upload.single("file"), async (req, res) => {
     }
 
     res.json(updatedEvent);
+
   } catch (error) {
-    console.error("Update Event Error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log("UPDATE EVENT ERROR:", error);
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -134,9 +140,10 @@ router.delete("/:id", async (req, res) => {
     }
 
     res.json({ message: "Event deleted successfully" });
+
   } catch (error) {
-    console.error("Delete Event Error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log("DELETE EVENT ERROR:", error);
+    res.status(500).json({ message: error.message });
   }
 });
 

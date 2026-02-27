@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const Notice = require("../models/Notice");
+const cloudinary = require("../config/cloudinary");
 
 /* ================= MULTER CONFIG ================= */
 
@@ -21,34 +22,30 @@ const upload = multer({ storage });
 
 /* ================= CREATE NOTICE ================= */
 
-const cloudinary = require("../config/cloudinary");
-
 router.post("/add", upload.single("file"), async (req, res) => {
   try {
     const { title, description } = req.body;
 
-    let fileUrl = "";
-
-    if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "raw", // 🔥 important for pdf/doc
-        folder: "notices",
-      });
-
-      fileUrl = result.secure_url;
+    if (!req.file) {
+      return res.status(400).json({ message: "File is required" });
     }
+
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      resource_type: "raw", // important for pdf/doc/docx
+      folder: "notices",
+    });
 
     await Notice.create({
       title,
       description,
-      file: fileUrl, // ✅ SAVE CLOUDINARY URL
+      file: result.secure_url,
     });
 
     res.json({ message: "Notice created successfully" });
 
   } catch (error) {
-    console.log("Notice Upload Error:", error);
-    res.status(500).json({ message: "Upload failed" });
+    console.log("CREATE NOTICE ERROR:", error);
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -59,8 +56,8 @@ router.get("/", async (req, res) => {
     const notices = await Notice.find().sort({ createdAt: -1 });
     res.json(notices);
   } catch (error) {
-    console.error("Fetch Notices Error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log("Fetch Notices Error:", error);
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -75,9 +72,13 @@ router.put("/:id", upload.single("file"), async (req, res) => {
       description,
     };
 
-    // Only update file if new file uploaded
     if (req.file) {
-      updateData.file = req.file.path;
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "raw",
+        folder: "notices",
+      });
+
+      updateData.file = result.secure_url;
     }
 
     const updatedNotice = await Notice.findByIdAndUpdate(
@@ -91,9 +92,10 @@ router.put("/:id", upload.single("file"), async (req, res) => {
     }
 
     res.json(updatedNotice);
+
   } catch (error) {
-    console.error("Update Notice Error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log("UPDATE NOTICE ERROR:", error);
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -108,9 +110,10 @@ router.delete("/:id", async (req, res) => {
     }
 
     res.json({ message: "Notice deleted successfully" });
+
   } catch (error) {
-    console.error("Delete Notice Error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log("DELETE NOTICE ERROR:", error);
+    res.status(500).json({ message: error.message });
   }
 });
 
