@@ -9,32 +9,38 @@ const upload = multer({ storage });
 
 /* ================= UPLOAD ================= */
 
-router.post("/", upload.single("media"), async (req, res) => {
+router.post("/", upload.array("media"), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "No files uploaded" });
     }
 
-    // Upload to Cloudinary using promise wrapper
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { resource_type: "auto" },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
+    const uploadedItems = [];
 
-      stream.end(req.file.buffer);
-    });
+    for (const file of req.files) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { resource_type: "auto" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
 
-    const newItem = await Gallery.create({
-      url: result.secure_url,
-      public_id: result.public_id, // REQUIRED for delete
-      type: result.resource_type === "video" ? "video" : "image",
-    });
+        stream.end(file.buffer);
+      });
 
-    res.status(201).json(newItem);
+      const newItem = await Gallery.create({
+        url: result.secure_url,
+        public_id: result.public_id,
+        type: result.resource_type === "video" ? "video" : "image",
+      });
+
+      uploadedItems.push(newItem);
+    }
+
+    res.status(201).json(uploadedItems);
+
   } catch (error) {
     console.error("Gallery Upload Error:", error);
     res.status(500).json({ message: "Server error during upload" });

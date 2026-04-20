@@ -109,27 +109,21 @@ router.get("/approved", async (req, res) => {
 
 router.put("/approve/:id", async (req, res) => {
   try {
-    const school = await School.findById(req.params.id);
+    const school = await School.findByIdAndUpdate(
+      req.params.id,
+      { status: "approved" },
+      { new: true }
+    );
 
-    if (!school) {
-      return res.status(404).json({ message: "School not found" });
-    }
+    console.log("APPROVING SCHOOL:", school);
 
-    school.isApproved = true;
-    school.approvedAt = new Date();
-    await school.save();
+    // 🔥 SEND MAIL
+    await sendApprovalMail(school.email, school.name);
 
-    // ✅ MAIL SHOULD NOT BREAK APPROVAL
-    try {
-      await sendApprovalMail(school);
-    } catch (mailError) {
-      console.log("Mail failed but school approved:", mailError.message);
-    }
-
-    res.json({ message: "School approved successfully" });
+    res.json({ message: "School approved & email sent" });
   } catch (error) {
-    console.error("Approve School Error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error(error);
+    res.status(500).json({ message: "Approval failed" });
   }
 });
 

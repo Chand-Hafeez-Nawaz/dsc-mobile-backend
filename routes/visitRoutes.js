@@ -1,21 +1,25 @@
+console.log("VISIT ROUTES LOADED");
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const path = require("path");
 
 const Visit = require("../models/Visit");
 const School = require("../models/School");
 
+/* 🔥 CLOUDINARY SETUP */
+const cloudinary = require("../config/cloudinary");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
 /* ================= MULTER CONFIG ================= */
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    const uniqueName =
-      Date.now() + "-" + file.originalname.replace(/\s+/g, "_");
-    cb(null, uniqueName);
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+    return {
+      folder: "visit_files",
+      resource_type: "raw", // IMPORTANT for pdf/xlsx
+      public_id: Date.now() + "-" + file.originalname.replace(/\s+/g, "_"),
+    };
   },
 });
 
@@ -29,6 +33,8 @@ router.post(
   async (req, res) => {
     try {
       const { schoolId, students, visitDate, remarks } = req.body;
+
+      console.log("🔥 FILE FROM CLOUDINARY:", req.file); // DEBUG
 
       if (!req.file) {
         return res.status(400).json({ message: "File required" });
@@ -45,7 +51,7 @@ router.post(
         students,
         visitDate,
         remarks,
-        studentFile: req.file.path,
+        studentFile: req.file.path, // ✅ Cloudinary URL
       });
 
       res.status(201).json({
